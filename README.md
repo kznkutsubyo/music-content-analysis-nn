@@ -1,54 +1,86 @@
 # AI Music Genre Analyzer
 
-This repository contains a bachelor project focused on automatic music genre classification from audio recordings.
+Web application for automatic music genre recognition from audio recordings.
 
-The project compares classical machine learning methods and neural network models on the GTZAN dataset. It includes trained models, a FastAPI inference backend, and a React web application that allows users to upload an audio file and view genre predictions.
+The project combines several trained classifiers and exposes them through a FastAPI backend and a React frontend. A user can upload an audio file, run the analysis, see the predicted genre, compare outputs of individual models, and view basic model metrics.
 
-## Repository Structure
+## Implemented Models
 
-```text
-frontend/   React web application
-backend/    FastAPI inference backend
-training/   Training and evaluation scripts
+The repository contains trained model artifacts, so the application can be tested without retraining:
+
+| Model | File |
+| --- | --- |
+| AST | `backend/gtzan_ast_best.pt` |
+| CNN | `backend/artifacts/cnn_fbank_best.pt` |
+| Random Forest | `backend/artifacts/rf_mfcc.joblib` |
+| KNN | `backend/artifacts/knn_mfcc.joblib` |
+
+The large model files are stored with Git LFS. The GTZAN dataset itself is not included in the repository.
+
+## Requirements
+
+Install these tools before running the project:
+
+- Python 3.10 or newer
+- Node.js 18 or newer
+- npm
+- Git LFS
+- ffmpeg, recommended for decoding MP3/M4A/OGG and other audio formats
+
+On Arch Linux, for example:
+
+```bash
+sudo pacman -S python nodejs npm git-lfs ffmpeg
 ```
 
-## Trained Models
+On Ubuntu/Debian:
 
-The trained model files are included so the application can be tested without retraining:
-
-```text
-backend/gtzan_ast_best.pt
-backend/artifacts/cnn_fbank_best.pt
-backend/artifacts/rf_mfcc.joblib
-backend/artifacts/knn_mfcc.joblib
+```bash
+sudo apt update
+sudo apt install python3 python3-venv nodejs npm git-lfs ffmpeg
 ```
 
-These files are stored through Git LFS because the AST checkpoint is larger than the normal GitHub file limit.
+## Quick Start
 
-The GTZAN dataset itself is not included. The repository contains only the splits, training/evaluation code, trained artifacts, backend, and frontend.
+Clone the repository:
 
-Before committing or cloning the repository with model files, install Git LFS:
+```bash
+git clone https://github.com/kznkutsubyo/music-content-analysis-nn.git
+cd music-content-analysis-nn
+```
+
+Download the Git LFS model files:
 
 ```bash
 git lfs install
+git lfs pull
 ```
 
-## Backend
-
-The easiest way to prepare and run the project on Linux/macOS is:
+Install backend and frontend dependencies:
 
 ```bash
 ./scripts/setup.sh
+```
+
+Start the backend and frontend together:
+
+```bash
 ./scripts/run_app.sh
 ```
 
-The application will be available at:
+Open the web application:
 
 ```text
 http://127.0.0.1:5173/
 ```
 
-Manual backend run:
+To stop the application, press `Ctrl+C` in the terminal where `run_app.sh` is running.
+
+## Manual Run
+
+Use this option if you prefer to run backend and frontend in separate terminals.
+
+Terminal 1, backend:
 
 ```bash
 cd backend
@@ -58,15 +90,13 @@ pip install -r requirements-runtime.txt
 MODEL_DEVICE=cpu uvicorn app:app --host 127.0.0.1 --port 8001
 ```
 
-Health check:
+Backend health check:
 
 ```bash
 curl http://127.0.0.1:8001/health
 ```
 
-## Frontend
-
-Manual frontend run:
+Terminal 2, frontend:
 
 ```bash
 cd frontend
@@ -75,14 +105,72 @@ cp .env.example .env.local
 npm run dev -- --host 127.0.0.1 --port 5173
 ```
 
-Default frontend URL:
+Frontend URL:
 
 ```text
 http://127.0.0.1:5173/
 ```
 
+## Configuration
+
+The run script uses CPU by default:
+
+```bash
+./scripts/run_app.sh
+```
+
+If CUDA is available and the installed PyTorch build supports it, the backend can be started with:
+
+```bash
+MODEL_DEVICE=cuda ./scripts/run_app.sh
+```
+
+Default ports:
+
+| Service | URL |
+| --- | --- |
+| Backend API | `http://127.0.0.1:8001` |
+| Frontend | `http://127.0.0.1:5173` |
+
+## Repository Structure
+
+```text
+backend/    FastAPI backend, inference code, trained models, metrics
+frontend/   React web application
+training/   Training and evaluation scripts
+scripts/    Setup and launch scripts
+```
+
+## Supported Audio Formats
+
+The upload form accepts common audio formats such as:
+
+```text
+WAV, MP3, FLAC, OGG, AU, AIFF, M4A, AAC
+```
+
+For best compatibility with compressed formats, install `ffmpeg`.
+
+## Troubleshooting
+
+If model files are missing after cloning, run:
+
+```bash
+git lfs pull
+```
+
+If the backend cannot decode an audio file, install `ffmpeg` and try again.
+
+If a port is already in use, choose another port:
+
+```bash
+BACKEND_PORT=8010 FRONTEND_PORT=5174 ./scripts/run_app.sh
+```
+
+If dependency installation fails, make sure that the active Python version is 3.10 or newer and that `python3-venv` is installed on Debian/Ubuntu systems.
+
 ## Notes
 
-- The frontend profile and history functionality is prototype-only and uses client-side storage.
-- Production deployment would require server-side authentication, a database, and secure handling of uploaded files.
-- The GTZAN dataset has known limitations; reported metrics should be interpreted in the context of the experimental setup.
+- The frontend profile and history functionality is a prototype and uses browser local storage.
+- The GTZAN dataset has known limitations, so reported metrics should be interpreted in the context of the experimental setup.
+- Production deployment would require server-side authentication, database storage, and stricter upload security.

@@ -1,4 +1,3 @@
-# prepare_gtzan.py
 from __future__ import annotations
 from pathlib import Path
 import json
@@ -23,9 +22,7 @@ def collect_files(audio_root: Path):
         for wav in sorted(genre_dir.glob("*.wav")):
             rows.append((str(wav.resolve()), genre))
     if not rows:
-        # fallback: если вдруг wav лежат глубже
         for wav in sorted(audio_root.rglob("*.wav")):
-            # пробуем взять жанр как имя родительской папки
             genre = wav.parent.name
             rows.append((str(wav.resolve()), genre))
     return rows

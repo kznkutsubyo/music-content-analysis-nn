@@ -10,24 +10,19 @@ OUT_ROOT = Path(r"..\data\gtzan_wav\genres").resolve()
 TARGET_SR = 16000
 
 def convert_one(src: Path, dst: Path):
-    # читаем .au через libsndfile (soundfile)
-    audio, sr = sf.read(str(src), always_2d=True)  # shape: [T, C]
+    audio, sr = sf.read(str(src), always_2d=True)
     audio = audio.astype(np.float32)
 
-    # в mono
     if audio.shape[1] > 1:
         audio = audio.mean(axis=1, keepdims=True)
 
-    # numpy -> torch [1, T]
-    wav = torch.from_numpy(audio.T)  # [C, T] где C=1
+    wav = torch.from_numpy(audio.T)
 
-    # ресемпл до 16k
     if sr != TARGET_SR:
         wav = torchaudio.functional.resample(wav, sr, TARGET_SR)
 
     dst.parent.mkdir(parents=True, exist_ok=True)
 
-    # сохраняем wav (PCM_16)
     sf.write(str(dst), wav.squeeze(0).cpu().numpy(), TARGET_SR, subtype="PCM_16")
 
 def main():

@@ -1,4 +1,3 @@
-// src/pages/Result.jsx
 import React, { useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { saveHistoryItem } from "../lib/history";

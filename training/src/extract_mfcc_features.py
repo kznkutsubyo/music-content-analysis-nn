@@ -1,4 +1,3 @@
-# extract_mfcc_features.py
 from __future__ import annotations
 from pathlib import Path
 import argparse, csv, json, random
@@ -22,14 +21,14 @@ def read_audio_soundfile(path: str):
     if not p.exists():
         raise FileNotFoundError(f"Audio file not found: {p}")
 
-    audio, sr0 = sf.read(str(p), dtype="float32", always_2d=True)  # [T, C]
+    audio, sr0 = sf.read(str(p), dtype="float32", always_2d=True)
     if audio.size == 0:
         raise RuntimeError(f"Empty audio file: {p}")
 
     if audio.shape[1] > 1:
         audio = audio.mean(axis=1, keepdims=True)
 
-    y = torch.from_numpy(audio.T)  # [1, T]
+    y = torch.from_numpy(audio.T)
     return y, int(sr0)
 
 def crop_or_pad(y: torch.Tensor, sr: int, crop_sec: float, train: bool, seed: int, idx: int):
@@ -43,7 +42,6 @@ def crop_or_pad(y: torch.Tensor, sr: int, crop_sec: float, train: bool, seed: in
     if T == crop_len:
         return y
 
-    # deterministic random crop for train (so features are reproducible)
     if train:
         rng = random.Random(seed + idx)
         start = rng.randint(0, T - crop_len)
@@ -53,7 +51,6 @@ def crop_or_pad(y: torch.Tensor, sr: int, crop_sec: float, train: bool, seed: in
     return y[:, start:start + crop_len]
 
 def mfcc_stats(y: torch.Tensor, sr: int, num_ceps: int = 20, num_mel_bins: int = 40):
-    # torchaudio.compliance.kaldi.mfcc expects [1, T] waveform on CPU
     mfcc = torchaudio.compliance.kaldi.mfcc(
         y,
         sample_frequency=sr,
@@ -63,11 +60,11 @@ def mfcc_stats(y: torch.Tensor, sr: int, num_ceps: int = 20, num_mel_bins: int =
         use_energy=False,
         dither=0.0,
         window_type="hanning",
-    )  # [frames, num_ceps]
+    )
 
     m = mfcc.mean(dim=0)
     s = mfcc.std(dim=0, unbiased=False)
-    feat = torch.cat([m, s], dim=0)  # [2*num_ceps]
+    feat = torch.cat([m, s], dim=0)
     return feat.numpy().astype(np.float32)
 
 def extract_split(items, label2idx, target_sr: int, crop_sec: float, train: bool, seed: int):
@@ -94,7 +91,7 @@ def extract_split(items, label2idx, target_sr: int, crop_sec: float, train: bool
         except Exception as e:
             raise RuntimeError(f"Failed on file: {path}\n{e}") from e
 
-    X = np.stack(X, axis=0)  # [N, D]
+    X = np.stack(X, axis=0)
     y = np.array(y, dtype=np.int64)
     return X, y, np.array(paths)
 

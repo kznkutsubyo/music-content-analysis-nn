@@ -27,7 +27,6 @@ if [ ! -d ".venv" ]; then
   "$PYTHON_BIN" -m venv .venv
 fi
 
-# shellcheck disable=SC1091
 source "$BACKEND_DIR/.venv/bin/activate"
 python -m pip install --upgrade pip
 python -m pip install -r "$BACKEND_DIR/requirements-runtime.txt"

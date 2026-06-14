@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-# @Time    : 6/10/21 11:00 PM
-# @Author  : Yuan Gong
-# @Affiliation  : Massachusetts Institute of Technology
-# @Email   : yuangong@mit.edu
-# @File    : traintest.py
 
 import sys
 import os
@@ -22,7 +16,6 @@ def train(audio_model, train_loader, test_loader, args):
     print('running on ' + str(device))
     torch.set_grad_enabled(True)
 
-    # Initialize all of the statistics we want to keep track of
     batch_time = AverageMeter()
     per_sample_time = AverageMeter()
     data_time = AverageMeter()
@@ -30,7 +23,6 @@ def train(audio_model, train_loader, test_loader, args):
     loss_meter = AverageMeter()
     per_sample_dnn_time = AverageMeter()
     progress = []
-    # best_cum_mAP is checkpoint ensemble from the first epoch to the best epoch
     best_epoch, best_cum_epoch, best_mAP, best_acc, best_cum_mAP = 0, 0, -np.inf, -np.inf, -np.inf
     global_step, epoch = 0, 0
     start_time = time.time()
@@ -46,13 +38,11 @@ def train(audio_model, train_loader, test_loader, args):
         audio_model = nn.DataParallel(audio_model)
 
     audio_model = audio_model.to(device)
-    # Set up the optimizer
     trainables = [p for p in audio_model.parameters() if p.requires_grad]
     print('Total parameter number is : {:.3f} million'.format(sum(p.numel() for p in audio_model.parameters()) / 1e6))
     print('Total trainable parameter number is : {:.3f} million'.format(sum(p.numel() for p in trainables) / 1e6))
     optimizer = torch.optim.Adam(trainables, args.lr, weight_decay=5e-7, betas=(0.95, 0.999))
 
-    # dataset specific settings
     main_metrics = args.metrics
     if args.loss == 'BCE':
         loss_fn = nn.BCEWithLogitsLoss()
@@ -64,34 +54,8 @@ def train(audio_model, train_loader, test_loader, args):
     print('now training with {:s}, main metrics: {:s}, loss function: {:s}, learning rate scheduler: {:s}'.format(str(args.dataset), str(main_metrics), str(loss_fn), str(scheduler)))
     print('The learning rate scheduler starts at {:d} epoch with decay rate of {:.3f} every {:d} epochs'.format(args.lrscheduler_start, args.lrscheduler_decay, args.lrscheduler_step))
 
-    # 11/30/22: I decouple the dataset and the following hyper-parameters to make it easier to adapt to new datasets
-    # if args.dataset == 'audioset':
-    #     if len(train_loader.dataset) > 2e5:
-    #         print('scheduler for full audioset is used')
-    #         scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [2,3,4,5], gamma=0.5, last_epoch=-1)
-    #     else:
-    #         print('scheduler for balanced audioset is used')
-    #         scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [10, 15, 20, 25], gamma=0.5, last_epoch=-1)
-    #     main_metrics = 'mAP'
-    #     loss_fn = nn.BCEWithLogitsLoss()
-    #     warmup = True
-    # elif args.dataset == 'esc50':
-    #     print('scheduler for esc-50 is used')
-    #     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, list(range(5,26)), gamma=0.85)
-    #     main_metrics = 'acc'
-    #     loss_fn = nn.CrossEntropyLoss()
-    #     warmup = False
-    # elif args.dataset == 'speechcommands':
-    #     print('scheduler for speech commands is used')
-    #     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, list(range(5,26)), gamma=0.85)
-    #     main_metrics = 'acc'
-    #     loss_fn = nn.BCEWithLogitsLoss()
-    #     warmup = False
-    # else:
-    #     raise ValueError('unknown dataset, dataset should be in [audioset, speechcommands, esc50]')
 
     epoch += 1
-    # for amp
     scaler = GradScaler()
 
     print("current #steps=%s, #epochs=%s" % (global_step, epoch))
@@ -116,7 +80,6 @@ def train(audio_model, train_loader, test_loader, args):
             per_sample_data_time.update((time.time() - end_time) / audio_input.shape[0])
             dnn_start_time = time.time()
 
-            # first several steps for warm-up
             if global_step <= 1000 and global_step % 50 == 0 and warmup == True:
                 warm_lr = (global_step / 1000) * args.lr
                 for param_group in optimizer.param_groups:
@@ -130,18 +93,12 @@ def train(audio_model, train_loader, test_loader, args):
                 else:
                     loss = loss_fn(audio_output, labels)
 
-            # optimization if amp is not used
-            # optimizer.zero_grad()
-            # loss.backward()
-            # optimizer.step()
 
-            # optimiztion if amp is used
             optimizer.zero_grad()
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
 
-            # record loss
             loss_meter.update(loss.item(), B)
             batch_time.update(time.time() - end_time)
             per_sample_time.update((time.time() - end_time)/audio_input.shape[0])
@@ -169,7 +126,6 @@ def train(audio_model, train_loader, test_loader, args):
         print('start validation')
         stats, valid_loss = validate(audio_model, test_loader, args, epoch)
 
-        # ensemble results
         cum_stats = validate_ensemble(args, epoch)
         cum_mAP = np.mean([stat['AP'] for stat in cum_stats])
         cum_mAUC = np.mean([stat['auc'] for stat in cum_stats])
@@ -244,11 +200,6 @@ def train(audio_model, train_loader, test_loader, args):
         loss_meter.reset()
         per_sample_dnn_time.reset()
 
-    # if args.dataset == 'audioset':
-    #     if len(train_loader.dataset) > 2e5:
-    #         stats=validate_wa(audio_model, test_loader, args, 1, 5)
-    #     else:
-    #         stats=validate_wa(audio_model, test_loader, args, 6, 25)
     if args.wa == True:
         stats = validate_wa(audio_model, test_loader, args, args.wa_start, args.wa_end)
         mAP = np.mean([stat['AP'] for stat in stats])
@@ -275,7 +226,6 @@ def validate(audio_model, val_loader, args, epoch):
     if not isinstance(audio_model, nn.DataParallel):
         audio_model = nn.DataParallel(audio_model)
     audio_model = audio_model.to(device)
-    # switch to evaluate mode
     audio_model.eval()
 
     end = time.time()
@@ -286,7 +236,6 @@ def validate(audio_model, val_loader, args, epoch):
         for i, (audio_input, labels) in enumerate(val_loader):
             audio_input = audio_input.to(device)
 
-            # compute output
             audio_output = audio_model(audio_input)
             audio_output = torch.sigmoid(audio_output)
             predictions = audio_output.to('cpu').detach()
@@ -294,7 +243,6 @@ def validate(audio_model, val_loader, args, epoch):
             A_predictions.append(predictions)
             A_targets.append(labels)
 
-            # compute the loss
             labels = labels.to(device)
             if isinstance(args.loss_fn, torch.nn.CrossEntropyLoss):
                 loss = args.loss_fn(audio_output, torch.argmax(labels.long(), axis=1))
@@ -310,7 +258,6 @@ def validate(audio_model, val_loader, args, epoch):
         loss = np.mean(A_loss)
         stats = calculate_stats(audio_output, target)
 
-        # save the prediction here
         exp_dir = args.exp_dir
         if os.path.exists(exp_dir+'/predictions') == False:
             os.mkdir(exp_dir+'/predictions')
@@ -328,7 +275,6 @@ def validate_ensemble(args, epoch):
         cum_predictions = np.loadtxt(exp_dir + '/predictions/cum_predictions.csv', delimiter=',') * (epoch - 1)
         predictions = np.loadtxt(exp_dir+'/predictions/predictions_' + str(epoch) + '.csv', delimiter=',')
         cum_predictions = cum_predictions + predictions
-        # remove the prediction file to save storage space
         os.remove(exp_dir+'/predictions/predictions_' + str(epoch-1) + '.csv')
 
     cum_predictions = cum_predictions / epoch
@@ -350,11 +296,9 @@ def validate_wa(audio_model, val_loader, args, start_epoch, end_epoch):
             sdA[key] = sdA[key] + sdB[key]
         model_cnt += 1
 
-        # if choose not to save models of epoch, remove to save space
         if args.save_model == False:
             os.remove(exp_dir + '/models/audio_model.' + str(epoch) + '.pth')
 
-    # averaging
     for key in sdA:
         sdA[key] = sdA[key] / float(model_cnt)
 

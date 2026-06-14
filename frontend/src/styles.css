@@ -1,10 +1,8 @@
-/* =========================
-   Design tokens
-========================= */
+
 
 :root {
     --color-bg-body: #f5f5f7;
-    --color-hero: #4d51c9; /* purple background */
+    --color-hero: #4d51c9;
     --color-nav-bg: #ffffff;
     --color-card-bg: #ffffff;
 
@@ -58,9 +56,7 @@
     --shadow-card: 0 18px 40px rgba(0, 0, 0, 0.45);
 }
 
-/* =========================
-   Base / reset
-========================= */
+
 
 *,
 *::before,
@@ -83,7 +79,7 @@ body {
     color: var(--color-text-dark);
 }
 
-/* Utility */
+
 
 .visually-hidden {
     position: absolute;
@@ -97,9 +93,7 @@ body {
     border: 0;
 }
 
-/* =========================
-   App shell
-========================= */
+
 
 .app-root {
     min-height: 100vh;
@@ -107,16 +101,14 @@ body {
     flex-direction: column;
 }
 
-/* ВАЖНО: любой <main> растягивается на оставшуюся высоту */
+
 .app-root > main {
     flex: 1;
     display: flex;
-    min-height: 0; /* фикс для flex */
+    min-height: 0;
 }
 
-/* =========================
-   Top navigation
-========================= */
+
 
 .topnav {
     background: var(--color-nav-bg);
@@ -300,9 +292,7 @@ body {
     border-radius: var(--radius-pill);
 }
 
-/* =========================
-   Buttons
-========================= */
+
 
 .btn {
     border-radius: var(--radius-pill);
@@ -352,11 +342,7 @@ body {
     box-shadow: none;
 }
 
-/* =========================
-   Purple page section (fills height)
-   Используй на всех страницах:
-   <section className="purple-page">...</section>
-========================= */
+
 
 .purple-page {
     background: var(--color-hero);
@@ -369,15 +355,13 @@ body {
     padding: 80px 16px 120px;
 }
 
-/* вариант, когда надо не по центру, а сверху (History) */
+
 .purple-page--top {
     align-items: flex-start;
     padding: 60px 16px 80px;
 }
 
-/* =========================
-   Home (P1_WF1)
-========================= */
+
 
 .home-hero {
     color: var(--color-text-main);
@@ -418,9 +402,7 @@ body {
     min-width: 260px;
 }
 
-/* =========================
-   Cards (common)
-========================= */
+
 
 .card {
     background: var(--color-card-bg);
@@ -440,9 +422,7 @@ body {
     padding: 32px 40px 28px;
 }
 
-/* =========================
-   Upload (P1_WF2)
-========================= */
+
 
 .upload-card__dropzone {
     display: flex;
@@ -517,9 +497,7 @@ body {
     box-shadow: none;
 }
 
-/* =========================
-   Analyzing (P1_WF3)
-========================= */
+
 
 .analyzing-card__header {
     display: flex;
@@ -559,9 +537,7 @@ body {
     }
 }
 
-/* =========================
-   Result (P1_WF4)
-========================= */
+
 
 .result-card {
     max-width: 640px;
@@ -727,9 +703,7 @@ body {
     text-decoration: none;
 }
 
-/* =========================
-   History (P1_WF5)
-========================= */
+
 
 .history-card {
     max-width: 960px;
@@ -791,9 +765,7 @@ body {
     font-size: 0.9rem;
 }
 
-/* =========================
-   Login (P0_WF1)
-========================= */
+
 
 .login-card {
     max-width: 460px;
@@ -847,9 +819,7 @@ body {
     padding-block: 6px;
 }
 
-/* =========================
-   Register (P0_WF2)
-========================= */
+
 
 .register-card {
     max-width: 520px;
@@ -917,9 +887,7 @@ body {
     justify-content: center;
 }
 
-/* =========================
-   Metrics
-========================= */
+
 
 .metrics-card {
     max-width: 980px;
@@ -982,9 +950,7 @@ body {
     padding-block: 8px;
 }
 
-/* =========================
-   Responsive
-========================= */
+
 
 @media (max-width: 768px) {
     .topnav__inner {

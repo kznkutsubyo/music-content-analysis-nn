@@ -32,7 +32,6 @@ def calc_recalls(S):
                 I_foundind = ind
             if I2A_ind[i, ind] == i:
                 A_foundind = ind
-        # do r1s
         if A_foundind == 0:
             A_r1.update(1)
         else:
@@ -41,7 +40,6 @@ def calc_recalls(S):
             I_r1.update(1)
         else:
             I_r1.update(0)
-        # do r5s
         if A_foundind >= 0 and A_foundind < 5:
             A_r5.update(1)
         else:
@@ -50,7 +48,6 @@ def calc_recalls(S):
             I_r5.update(1)
         else:
             I_r5.update(0)
-        # do r10s
         if A_foundind >= 0 and A_foundind < 10:
             A_r10.update(1)
         else:
@@ -62,7 +59,6 @@ def calc_recalls(S):
 
     recalls = {'A_r1':A_r1.avg, 'A_r5':A_r5.avg, 'A_r10':A_r10.avg,
                 'I_r1':I_r1.avg, 'I_r5':I_r5.avg, 'I_r10':I_r10.avg}
-                #'A_meanR':A_meanR.avg, 'I_meanR':I_meanR.avg}
 
     return recalls
 
@@ -169,7 +165,6 @@ def one_imposter_index(i, N):
 def basic_get_imposter_indices(N):
     imposter_idc = []
     for i in range(N):
-        # Select an imposter index for example i:
         imp_ind = one_imposter_index(i, N)
         imposter_idc.append(imp_ind)
     return imposter_idc
@@ -187,24 +182,16 @@ def semihardneg_triplet_loss_from_S(S, margin):
     assert(S.size(0) == S.size(1))
     N = S.size(0)
     loss = torch.autograd.Variable(torch.zeros(1).type(S.data.type()), requires_grad=True)
-    # Imposter - ground truth
     Sdiff = S - torch.diag(S).view(-1, 1)
     eps = 1e-12
-    # All examples less similar than ground truth
     mask = (Sdiff < -eps).type(torch.LongTensor)
     maskf = mask.type_as(S)
-    # Mask out all examples >= gt with minimum similarity
     Sp = maskf * Sdiff + (1 - maskf) * torch.min(Sdiff).detach()
-    # Find the index maximum similar of the remaining
     _, idc = Sp.max(dim=1)
     idc = idc.data.cpu()
-    # Vector mask: 1 iff there exists an example < gt
     has_neg = (mask.sum(dim=1) > 0).data.type(torch.LongTensor)
-    # Random imposter indices
     random_imp_ind = torch.LongTensor(basic_get_imposter_indices(N))
-    # Use hardneg if there exists an example < gt, otherwise use random imposter
     imp_idc = has_neg * idc + (1 - has_neg) * random_imp_ind
-    # This could probably be vectorized too, but I haven't.
     for i, imp in enumerate(imp_idc):
         local_loss = Sdiff[i, imp] + margin
         if (local_loss.data > 0).all():
@@ -224,10 +211,8 @@ def sampled_triplet_loss_from_S(S, margin):
     assert(S.size(0) == S.size(1))
     N = S.size(0)
     loss = torch.autograd.Variable(torch.zeros(1).type(S.data.type()), requires_grad=True)
-    # Imposter - ground truth
     Sdiff = S - torch.diag(S).view(-1, 1)
     imp_ind = torch.LongTensor(basic_get_imposter_indices(N))
-    # This could probably be vectorized too, but I haven't.
     for i, imp in enumerate(imp_ind):
         local_loss = Sdiff[i, imp] + margin
         if (local_loss.data > 0).all():

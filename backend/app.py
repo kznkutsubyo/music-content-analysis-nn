@@ -13,7 +13,6 @@ from predict_utils import Predictor, PredictorConfig, ROOT
 
 app = FastAPI(title="GTZAN Genre Classification API", version="1.0")
 
-# CORS (React dev)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -63,7 +62,6 @@ def health() -> Dict[str, Any]:
 
 @app.get("/metrics")
 def metrics() -> Dict[str, Any]:
-    # отдаём твой web_results.json если ты его делал
     p = ROOT / "web_results.json"
     if not p.exists():
         raise HTTPException(status_code=404, detail="web_results.json not found")

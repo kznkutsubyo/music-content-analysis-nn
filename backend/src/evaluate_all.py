@@ -1,4 +1,3 @@
-# evaluate_all.py
 from __future__ import annotations
 
 import argparse
@@ -14,7 +13,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 
-import torchaudio  # kaldi.fbank + kaldi.mfcc
+import torchaudio
 from torchaudio.transforms import Resample
 
 from sklearn.metrics import (
@@ -31,12 +30,10 @@ import matplotlib.pyplot as plt
 from models import ASTModel
 
 
-# ====== AST-style normalization (AudioSet stats) ======
 NORM_ADD = 4.26
 NORM_DIV = 4.57 * 2.0
 
 
-# ====== helpers ======
 def read_json(p: Path):
     return json.loads(p.read_text(encoding="utf-8"))
 
@@ -59,8 +56,6 @@ def resolve_audio_path(path_str: str, splits_dir: Path) -> Path:
     p = Path(path_str)
     if p.is_absolute():
         return p
-    # если в CSV относительные пути — считаем их относительно папки splits_dir
-    # (или относительно её родителя, если там лежит dataset)
     cand1 = (splits_dir / p).resolve()
     if cand1.exists():
         return cand1
@@ -71,12 +66,12 @@ def resolve_audio_path(path_str: str, splits_dir: Path) -> Path:
 
 
 def read_audio_soundfile(path: Path):
-    audio, sr0 = sf.read(str(path), dtype="float32", always_2d=True)  # [T, C]
+    audio, sr0 = sf.read(str(path), dtype="float32", always_2d=True)
     if audio.size == 0:
         raise RuntimeError(f"Empty audio file: {path}")
     if audio.shape[1] > 1:
         audio = audio.mean(axis=1, keepdims=True)
-    y = torch.from_numpy(audio.T)  # [1, T]
+    y = torch.from_numpy(audio.T)
     return y, int(sr0)
 
 
@@ -142,7 +137,6 @@ def save_eval_artifacts(out_dir: Path, y_true, y_pred, proba, labels: list[str],
     }
 
 
-# ====== AST dataset for evaluation ======
 class FbankDataset(Dataset):
     def __init__(self, items, label2idx, splits_dir: Path,
                  sr: int = 16000, crop_sec: float = 10.0, tdim: int = 1024,
@@ -170,7 +164,7 @@ class FbankDataset(Dataset):
             num_mel_bins=128,
             dither=0.0,
             frame_shift=10,
-        )  # [frames, 128]
+        )
 
         T = fb.shape[0]
         if T < self.tdim:
@@ -180,7 +174,7 @@ class FbankDataset(Dataset):
             fb = fb[start : start + self.tdim]
 
         fb = (fb + NORM_ADD) / NORM_DIV
-        return fb  # [tdim, 128]
+        return fb
 
     def __getitem__(self, idx):
         path_str, genre = self.items[idx]
@@ -196,12 +190,11 @@ class FbankDataset(Dataset):
             y = r(y)
 
         y = crop_or_pad(y, self.sr, self.crop_sec, train=self.train, seed=self.seed, idx=idx)
-        fb = self._to_fbank(y)  # [tdim, 128]
+        fb = self._to_fbank(y)
         label = self.label2idx[genre]
         return fb, label
 
 
-# ====== CNN model (same as train_cnn_gtzan.py) ======
 class SmallCNN(nn.Module):
     def __init__(self, n_classes: int):
         super().__init__()
@@ -259,14 +252,12 @@ def eval_torch_model(model, loader, device: torch.device, amp: bool = True):
     return y_true, y_pred, proba, ms_per_item
 
 
-# ====== MFCC feature extraction (if needed) ======
 def mfcc_stats_from_path(path: Path, target_sr: int, crop_sec: float):
     y, sr0 = read_audio_soundfile(path)
 
     if sr0 != target_sr:
         y = Resample(sr0, target_sr)(y)
 
-    # eval crop center
     y = crop_or_pad(y, target_sr, crop_sec, train=False, seed=0, idx=0)
 
     mfcc = torchaudio.compliance.kaldi.mfcc(
@@ -278,11 +269,11 @@ def mfcc_stats_from_path(path: Path, target_sr: int, crop_sec: float):
         use_energy=False,
         dither=0.0,
         window_type="hanning",
-    )  # [frames, 20]
+    )
 
     m = mfcc.mean(dim=0)
     s = mfcc.std(dim=0, unbiased=False)
-    feat = torch.cat([m, s], dim=0)  # [40]
+    feat = torch.cat([m, s], dim=0)
     return feat.numpy().astype(np.float32)
 
 
@@ -296,9 +287,8 @@ def try_load_mfcc_npz(features_dir: Path):
     return None
 
 
-# ====== main ======
 def main():
-    ROOT = Path(__file__).resolve().parents[1]  # ...\ast
+    ROOT = Path(__file__).resolve().parents[1]
     ap = argparse.ArgumentParser()
 
     ap.add_argument("--splits_dir", required=True, type=str)
@@ -308,16 +298,13 @@ def main():
     ap.add_argument("--pin_memory", action="store_true")
     ap.add_argument("--no_amp", action="store_true")
 
-    # AST
     ap.add_argument("--ast_ckpt", type=str, default=str(ROOT / "gtzan_ast_best.pt"))
     ap.add_argument("--ast_model_size", type=str, default="base384")
     ap.add_argument("--tdim", type=int, default=1024)
     ap.add_argument("--crop_sec", type=float, default=10.0)
 
-    # CNN
     ap.add_argument("--cnn_ckpt", type=str, default=str(ROOT / "artifacts" / "cnn_fbank_best.pt"))
 
-    # KNN / RF
     ap.add_argument("--features_dir", type=str, default=str(ROOT.parent / "features_mfcc"))
     ap.add_argument("--knn_model", type=str, default=str(ROOT / "artifacts" / "knn_mfcc.joblib"))
     ap.add_argument("--rf_model", type=str, default=str(ROOT / "artifacts" / "rf_mfcc.joblib"))
@@ -331,7 +318,6 @@ def main():
     device = torch.device(args.device)
     amp = not args.no_amp
 
-    # label order from splits
     label2idx = read_json(splits_dir / "label2idx.json")
     idx2label = {int(v): k for k, v in label2idx.items()}
     labels = [idx2label[i] for i in range(len(idx2label))]
@@ -340,7 +326,6 @@ def main():
 
     summary_rows = []
 
-    # ---------------- AST ----------------
     ast_ckpt = Path(args.ast_ckpt).resolve()
     if ast_ckpt.exists():
         print("EVAL AST:", ast_ckpt)
@@ -379,7 +364,6 @@ def main():
     else:
         print("SKIP AST: checkpoint not found:", ast_ckpt)
 
-    # ---------------- CNN ----------------
     cnn_ckpt = Path(args.cnn_ckpt).resolve()
     if cnn_ckpt.exists():
         print("EVAL CNN:", cnn_ckpt)
@@ -391,7 +375,6 @@ def main():
             train=False, seed=42
         )
 
-        # FbankDataset отдаёт [tdim,128], а CNN хочет [1,128,tdim]
         class WrapCNN(Dataset):
             def __init__(self, base: Dataset):
                 self.base = base
@@ -399,7 +382,7 @@ def main():
                 return len(self.base)
             def __getitem__(self, i):
                 fb, y = self.base[i]
-                x = fb.transpose(0, 1).unsqueeze(0)  # [1, 128, tdim]
+                x = fb.transpose(0, 1).unsqueeze(0)
                 return x, y
 
         loader = DataLoader(WrapCNN(ds), batch_size=args.batch_size, shuffle=False,
@@ -420,7 +403,6 @@ def main():
     else:
         print("SKIP CNN: checkpoint not found:", cnn_ckpt)
 
-    # ---------------- KNN / RF ----------------
     features_dir = Path(args.features_dir).resolve()
     test_npz = features_dir / "test_mfcc.npz"
 
@@ -441,7 +423,6 @@ def main():
             return
 
         if Xte is None or yte is None:
-            # fallback: compute MFCC on the fly (slow, but works)
             print(f"{name}: computing MFCC on the fly (slow)...")
             feats = []
             labels_y = []
@@ -472,13 +453,10 @@ def main():
     eval_sklearn("KNN", Path(args.knn_model).resolve(), "knn")
     eval_sklearn("RandomForest", Path(args.rf_model).resolve(), "rf")
 
-    # ---------------- summary table ----------------
     if summary_rows:
-        # stable order if available
         order = {"AST": 0, "CNN": 1, "RandomForest": 2, "KNN": 3}
         summary_rows.sort(key=lambda r: order.get(r["method"], 999))
 
-        # write CSV
         summary_csv = out_dir / "summary_table.csv"
         cols = ["method", "accuracy", "top3_accuracy", "macro_f1", "weighted_f1", "ms_per_item"]
         with summary_csv.open("w", encoding="utf-8", newline="") as f:

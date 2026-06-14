@@ -1,4 +1,3 @@
-# src/export_results_for_web.py
 from pathlib import Path
 import json
 
@@ -6,7 +5,7 @@ def read_json(p: Path):
     return json.loads(p.read_text(encoding="utf-8"))
 
 def main():
-    root = Path(__file__).resolve().parents[1]   # ast/
+    root = Path(__file__).resolve().parents[1]
     res = root / "results_compare"
     out = root / "web_results.json"
 

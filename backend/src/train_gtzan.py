@@ -1,4 +1,3 @@
-# train_gtzan.py
 from __future__ import annotations
 
 from pathlib import Path
@@ -13,12 +12,11 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 
-import torchaudio  # используем только для kaldi.fbank
+import torchaudio
 from torchaudio.transforms import Resample
 
 from models import ASTModel
 
-# Нормализация как в AST репо (AudioSet stats). Можно потом заменить на свои.
 NORM_ADD = 4.26
 NORM_DIV = 4.57 * 2.0
 
@@ -51,7 +49,6 @@ class GTZANDataset(Dataset):
         self.tdim = tdim
         self.seed = seed
 
-        # кэш ресэмплеров, чтобы не создавать Resample каждый раз
         self._resamplers: dict[int, Resample] = {}
 
     def __len__(self):
@@ -73,7 +70,6 @@ class GTZANDataset(Dataset):
             frame_shift=10,
         )
 
-        # pad/crop по времени до tdim
         T = fb.shape[0]
         if T < self.tdim:
             fb = torch.nn.functional.pad(fb, (0, 0, 0, self.tdim - T))
@@ -84,7 +80,6 @@ class GTZANDataset(Dataset):
                 start = (T - self.tdim) // 2
             fb = fb[start : start + self.tdim]
 
-        # нормализация
         fb = (fb + NORM_ADD) / NORM_DIV
         return fb
 
@@ -97,25 +92,21 @@ class GTZANDataset(Dataset):
         if not p.exists():
             raise FileNotFoundError(f"Audio file not found: {p}")
 
-        audio, sr0 = sf.read(str(p), dtype="float32", always_2d=True)  # [T, C]
+        audio, sr0 = sf.read(str(p), dtype="float32", always_2d=True)
         if audio.size == 0:
             raise RuntimeError(f"Empty audio file: {p}")
 
-        # mono
         if audio.shape[1] > 1:
             audio = audio.mean(axis=1, keepdims=True)
 
-        # numpy [T,1] -> torch [1,T]
-        y = torch.from_numpy(audio.T)  # [1, T], float32
+        y = torch.from_numpy(audio.T)
         return y, sr0
 
     def __getitem__(self, idx):
         path, genre = self.items[idx]
 
-        # 1) load via soundfile
-        y, sr0 = self._read_audio_soundfile(path)  # [1,T], sr0
+        y, sr0 = self._read_audio_soundfile(path)
 
-        # 2) resample до self.sr (если нужно)
         if sr0 != self.sr:
             resampler = self._resamplers.get(sr0)
             if resampler is None:
@@ -123,7 +114,6 @@ class GTZANDataset(Dataset):
                 self._resamplers[sr0] = resampler
             y = resampler(y)
 
-        # 3) crop по сырому сигналу
         crop_len = int(self.sr * self.crop_sec)
         if y.shape[1] < crop_len:
             y = torch.nn.functional.pad(y, (0, crop_len - y.shape[1]))
@@ -134,7 +124,6 @@ class GTZANDataset(Dataset):
                 start = (y.shape[1] - crop_len) // 2
             y = y[:, start : start + crop_len]
 
-        # 4) fbank -> [tdim, 128]
         fb = self._to_fbank(y, self.sr)
 
         label = self.label2idx[genre]
@@ -195,7 +184,6 @@ def save_checkpoint(path: Path, model, optimizer, label2idx, epoch: int, best_va
 
 def load_checkpoint(path: Path, device):
     ckpt = torch.load(path, map_location=device)
-    # базовые ключи должны быть
     for k in ["model_state", "label2idx"]:
         if k not in ckpt:
             raise KeyError(f"Checkpoint missing key: {k}")
@@ -220,10 +208,8 @@ def main():
     ap.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--save_path", type=str, default=str(Path("..") / "gtzan_ast_best.pt"))
 
-    # НОВОЕ: resume
     ap.add_argument("--resume", type=str, default="", help="Путь к чекпоинту для продолжения обучения")
 
-    # НОВОЕ: ускорение dataloader на CUDA
     ap.add_argument("--num_workers", type=int, default=0)
     ap.add_argument("--pin_memory", action="store_true")
 
@@ -232,7 +218,6 @@ def main():
     random.seed(args.seed)
     torch.manual_seed(args.seed)
 
-    # НОВОЕ: жёсткая проверка cuda
     if args.device.lower().startswith("cuda") and not torch.cuda.is_available():
         raise RuntimeError(
             "Ты указал --device cuda, но torch.cuda.is_available() == False.\n"
@@ -243,7 +228,6 @@ def main():
 
     splits_dir = Path(args.splits_dir).resolve()
 
-    # label2idx по умолчанию берём из splits, но если resume — возьмём из чекпоинта
     label2idx = json.loads((splits_dir / "label2idx.json").read_text(encoding="utf-8"))
 
     train_items = load_csv(splits_dir / "train.csv")
@@ -289,7 +273,6 @@ def main():
 
     save_path = Path(args.save_path).resolve()
 
-    # НОВОЕ: resume логика
     start_epoch = 1
     best_val = -1.0
 
@@ -299,15 +282,12 @@ def main():
 
         model.load_state_dict(ckpt["model_state"], strict=True)
 
-        # optimizer_state может отсутствовать в старых чекпоинтах
         if "optimizer_state" in ckpt:
             optimizer.load_state_dict(ckpt["optimizer_state"])
 
-        # epoch/best_val могут отсутствовать в старых чекпоинтах
         start_epoch = int(ckpt.get("epoch", 0)) + 1
         best_val = float(ckpt.get("best_val", -1.0))
 
-        # label2idx из чекпоинта (на всякий)
         label2idx = ckpt.get("label2idx", label2idx)
 
         print(f"RESUME: loaded {resume_path}")
@@ -330,7 +310,6 @@ def main():
             save_checkpoint(save_path, model, optimizer, label2idx, epoch, best_val)
             print("saved best to:", save_path, flush=True)
 
-    # финальная оценка на test по лучшему чекпоинту
     ckpt = load_checkpoint(save_path, device)
     model.load_state_dict(ckpt["model_state"], strict=True)
 

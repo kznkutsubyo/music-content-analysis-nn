@@ -4,18 +4,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 def get_labels():
-    # Пытаемся взять правильный порядок меток из label2idx.json
-    splits = Path(__file__).resolve().parents[1] / "gtzan_splits" / "label2idx.json"  # ast/gtzan_splits/...
+    splits = Path(__file__).resolve().parents[1] / "gtzan_splits" / "label2idx.json"
     if splits.exists():
         label2idx = json.loads(splits.read_text(encoding="utf-8"))
         idx2label = {v: k for k, v in label2idx.items()}
         return [idx2label[i] for i in range(len(idx2label))]
-    # fallback (если файла нет)
     return ["blues","classical","country","disco","hiphop","jazz","metal","pop","reggae","rock"]
 
 def main():
-    # results лежит в bc/results (на 2 уровня выше, чем src)
-    results_dir = Path(__file__).resolve().parents[2] / "results"  # ...\bc\results
+    results_dir = Path(__file__).resolve().parents[2] / "results"
     cm_path = results_dir / "confusion_matrix.npy"
 
     if not cm_path.exists():

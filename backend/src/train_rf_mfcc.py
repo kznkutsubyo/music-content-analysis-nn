@@ -1,4 +1,3 @@
-# train_rf_mfcc.py
 from __future__ import annotations
 from pathlib import Path
 import argparse, json
@@ -52,7 +51,7 @@ def main():
     ap.add_argument("--out_model", default=str(Path("..") / "artifacts" / "rf_mfcc.joblib"))
     ap.add_argument("--out_results", default=str(Path("..") / "results" / "rf"))
     ap.add_argument("--n_estimators", type=int, default=600)
-    ap.add_argument("--max_depth", type=int, default=0)  # 0 => None
+    ap.add_argument("--max_depth", type=int, default=0)
     ap.add_argument("--seed", type=int, default=42)
     args = ap.parse_args()
 
@@ -63,7 +62,6 @@ def main():
 
     idx2label = json.loads((features_dir / "idx2label.json").read_text(encoding="utf-8"))
 
-    # train on train+val
     X_all = np.concatenate([Xtr, Xva], axis=0)
     y_all = np.concatenate([ytr, yva], axis=0)
 

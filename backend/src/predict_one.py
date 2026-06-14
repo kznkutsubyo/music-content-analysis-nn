@@ -1,4 +1,3 @@
-# predict_one.py
 from __future__ import annotations
 from pathlib import Path
 import json
@@ -62,7 +61,7 @@ def main():
         start = (y.shape[1] - crop_len) // 2
         y = y[:, start:start + crop_len]
 
-    fb = to_fbank(y, SR).unsqueeze(0)  # [1, 1024, 128]
+    fb = to_fbank(y, SR).unsqueeze(0)
 
     with torch.no_grad():
         logits = model(fb)

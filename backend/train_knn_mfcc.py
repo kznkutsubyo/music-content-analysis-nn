@@ -1,4 +1,3 @@
-# train_knn_mfcc.py
 from __future__ import annotations
 from pathlib import Path
 import argparse
@@ -66,19 +65,16 @@ def main():
 
     print(f"\nBEST: k={best_k}, val acc={best_acc:.4f}")
 
-    # test evaluation (for sanity)
     te_pred = best_model.predict(Xte)
     te_acc = accuracy_score(yte, te_pred)
     print(f"TEST acc={te_acc:.4f}")
 
-    # save artifacts
     save_path = Path(args.save_path).resolve()
     save_path.parent.mkdir(parents=True, exist_ok=True)
 
     dump(best_model, save_path)
     print("Saved KNN model to:", save_path)
 
-    # optional: save simple report рядом
     report = classification_report(yte, te_pred, digits=4)
     (save_path.parent / "knn_test_report.txt").write_text(report, encoding="utf-8")
     np.save(save_path.parent / "knn_test_confusion_matrix.npy", confusion_matrix(yte, te_pred))

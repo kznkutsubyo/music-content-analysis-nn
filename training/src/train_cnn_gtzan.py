@@ -1,4 +1,3 @@
-# train_cnn_gtzan.py
 from __future__ import annotations
 from pathlib import Path
 import argparse, csv, json, random
@@ -10,10 +9,9 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 
-import torchaudio  # используем только kaldi.fbank
+import torchaudio
 from torchaudio.transforms import Resample
 
-# такая же нормализация, как у AST (AudioSet stats)
 NORM_ADD = 4.26
 NORM_DIV = 4.57 * 2.0
 
@@ -40,12 +38,12 @@ class GTZANFbankDataset(Dataset):
         return len(self.items)
 
     def _read_audio(self, path: str):
-        audio, sr0 = sf.read(path, dtype="float32", always_2d=True)  # [T, C]
+        audio, sr0 = sf.read(path, dtype="float32", always_2d=True)
         if audio.size == 0:
             raise RuntimeError(f"Empty audio: {path}")
         if audio.shape[1] > 1:
             audio = audio.mean(axis=1, keepdims=True)
-        y = torch.from_numpy(audio.T)  # [1, T]
+        y = torch.from_numpy(audio.T)
         return y, int(sr0)
 
     def _crop(self, y: torch.Tensor, idx: int):
@@ -72,7 +70,7 @@ class GTZANFbankDataset(Dataset):
             num_mel_bins=128,
             dither=0.0,
             frame_shift=10,
-        )  # [frames, 128]
+        )
 
         T = fb.shape[0]
         if T < self.tdim:
@@ -85,8 +83,7 @@ class GTZANFbankDataset(Dataset):
                 start = (T - self.tdim) // 2
             fb = fb[start:start + self.tdim]
 
-        fb = (fb + NORM_ADD) / NORM_DIV  # [tdim, 128]
-        # CNN ждёт [C, H, W] => [1, 128, tdim]
+        fb = (fb + NORM_ADD) / NORM_DIV
         x = fb.transpose(0, 1).unsqueeze(0)
         return x
 
@@ -221,7 +218,6 @@ def main():
             torch.save({"model_state": model.state_dict(), "label2idx": label2idx}, save_path)
             print("saved best to:", save_path)
 
-    # test
     ckpt = torch.load(save_path, map_location=device)
     model.load_state_dict(ckpt["model_state"])
     te_loss, te_acc = run_epoch(model, test_loader, criterion, optimizer, device, train=False, use_amp=args.use_amp)

@@ -22,21 +22,18 @@ from torchaudio.transforms import Resample
 from joblib import load as joblib_load
 
 
-# ----- add repo src to sys.path so we can import ASTModel -----
 ROOT = Path(__file__).resolve().parent
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from models import ASTModel  # noqa: E402
+from models import ASTModel
 
 
-# ----- normalization like AST repo -----
 NORM_ADD = 4.26
 NORM_DIV = 4.57 * 2.0
 
 
-# ----- CNN used in evaluate_all.py -----
 class SmallCNN(nn.Module):
     def __init__(self, n_classes: int):
         super().__init__()
@@ -74,18 +71,17 @@ def _idx2label(label2idx: Dict[str, int]) -> List[str]:
 
 
 def _soundfile_read(path: Path) -> Tuple[torch.Tensor, int]:
-    # returns y: [1, T] float32
     try:
-        audio, sr = sf.read(str(path), dtype="float32", always_2d=True)  # [T, C]
+        audio, sr = sf.read(str(path), dtype="float32", always_2d=True)
         if audio.size == 0:
             raise RuntimeError("Empty audio file")
         if audio.shape[1] > 1:
             audio = audio.mean(axis=1, keepdims=True)
-        y = torch.from_numpy(audio.T)  # [1, T]
+        y = torch.from_numpy(audio.T)
         return y, int(sr)
     except Exception as soundfile_error:
         try:
-            y, sr = torchaudio.load(str(path))  # [C, T]
+            y, sr = torchaudio.load(str(path))
         except Exception as torchaudio_error:
             ffmpeg_error_msg = "not attempted"
             try:
@@ -151,7 +147,7 @@ def _to_fbank(y: torch.Tensor, sr: int, tdim: int) -> torch.Tensor:
         num_mel_bins=128,
         dither=0.0,
         frame_shift=10,
-    )  # [frames, 128]
+    )
 
     T = fb.shape[0]
     if T < tdim:
@@ -161,7 +157,7 @@ def _to_fbank(y: torch.Tensor, sr: int, tdim: int) -> torch.Tensor:
         fb = fb[start:start + tdim]
 
     fb = (fb + NORM_ADD) / NORM_DIV
-    return fb  # [tdim, 128]
+    return fb
 
 
 def _mfcc_stats(y: torch.Tensor, sr: int) -> np.ndarray:
@@ -174,11 +170,11 @@ def _mfcc_stats(y: torch.Tensor, sr: int) -> np.ndarray:
         use_energy=False,
         dither=0.0,
         window_type="hanning",
-    )  # [frames, 20]
+    )
 
     m = mfcc.mean(dim=0)
     s = mfcc.std(dim=0, unbiased=False)
-    feat = torch.cat([m, s], dim=0)  # [40]
+    feat = torch.cat([m, s], dim=0)
     return feat.numpy().astype(np.float32)
 
 
@@ -202,18 +198,15 @@ class PredictorConfig:
     splits_dir: Path
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
 
-    # AST
     ast_ckpt: Path = ROOT / "gtzan_ast_best.pt"
     ast_model_size: str = "base384"
     ast_tdim: int = 1024
     ast_crop_sec: float = 10.0
 
-    # CNN
     cnn_ckpt: Path = ROOT / "artifacts" / "cnn_fbank_best.pt"
     cnn_tdim: int = 1024
     cnn_crop_sec: float = 10.0
 
-    # MFCC models
     knn_path: Path = ROOT / "artifacts" / "knn_mfcc.joblib"
     rf_path: Path = ROOT / "artifacts" / "rf_mfcc.joblib"
     mfcc_crop_sec: float = 30.0
@@ -226,16 +219,13 @@ class Predictor:
         self.cfg = cfg
         self.device = torch.device(cfg.device)
 
-        # label map
         label2idx_path = cfg.splits_dir / "label2idx.json"
         self.label2idx = _read_label2idx(label2idx_path)
         self.labels = _idx2label(self.label2idx)
         self.n_classes = len(self.labels)
 
-        # cache resamplers by input sr
         self._resamplers: Dict[int, Resample] = {}
 
-        # models
         self.ast_model: Optional[nn.Module] = None
         self.cnn_model: Optional[nn.Module] = None
         self.knn = None
@@ -251,7 +241,6 @@ class Predictor:
         return r
 
     def _load_models(self):
-        # AST
         if self.cfg.ast_ckpt.exists():
             ckpt = torch.load(self.cfg.ast_ckpt, map_location=self.device)
             m = ASTModel(
@@ -265,7 +254,6 @@ class Predictor:
             m.eval()
             self.ast_model = m
 
-        # CNN
         if self.cfg.cnn_ckpt.exists():
             ckpt = torch.load(self.cfg.cnn_ckpt, map_location=self.device)
             m = SmallCNN(n_classes=self.n_classes).to(self.device)
@@ -273,7 +261,6 @@ class Predictor:
             m.eval()
             self.cnn_model = m
 
-        # KNN / RF
         if self.cfg.knn_path.exists():
             self.knn = joblib_load(self.cfg.knn_path)
         if self.cfg.rf_path.exists():
@@ -292,8 +279,8 @@ class Predictor:
     def _predict_ast(self, y: torch.Tensor, sr: int) -> Dict[str, Any]:
         assert self.ast_model is not None
         y10 = _center_crop_or_pad(y, sr, self.cfg.ast_crop_sec)
-        fb = _to_fbank(y10, sr, self.cfg.ast_tdim)  # [tdim,128]
-        xb = fb.unsqueeze(0).to(self.device, non_blocking=True)  # [1,tdim,128]
+        fb = _to_fbank(y10, sr, self.cfg.ast_tdim)
+        xb = fb.unsqueeze(0).to(self.device, non_blocking=True)
 
         with torch.inference_mode():
             with _cuda_autocast_enabled(self.device):
@@ -304,8 +291,8 @@ class Predictor:
     def _predict_cnn(self, y: torch.Tensor, sr: int) -> Dict[str, Any]:
         assert self.cnn_model is not None
         y10 = _center_crop_or_pad(y, sr, self.cfg.cnn_crop_sec)
-        fb = _to_fbank(y10, sr, self.cfg.cnn_tdim)  # [tdim,128]
-        x = fb.transpose(0, 1).unsqueeze(0).unsqueeze(0)  # [1,1,128,tdim]
+        fb = _to_fbank(y10, sr, self.cfg.cnn_tdim)
+        x = fb.transpose(0, 1).unsqueeze(0).unsqueeze(0)
         x = x.to(self.device, non_blocking=True)
 
         with torch.inference_mode():
@@ -316,12 +303,11 @@ class Predictor:
 
     def _predict_mfcc_model(self, model, y: torch.Tensor, sr: int) -> Dict[str, Any]:
         y30 = _center_crop_or_pad(y, sr, self.cfg.mfcc_crop_sec)
-        feat = _mfcc_stats(y30, sr).reshape(1, -1)  # [1,40]
-        proba = model.predict_proba(feat)[0]  # [C]
+        feat = _mfcc_stats(y30, sr).reshape(1, -1)
+        proba = model.predict_proba(feat)[0]
         return _topk(proba, self.labels, k=3)
 
     def predict_from_bytes(self, data: bytes, filename: str) -> Dict[str, Any]:
-        # write to temp file so soundfile can read it
         suffix = Path(filename).suffix or ".wav"
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as f:
             tmp = Path(f.name)
@@ -342,25 +328,21 @@ class Predictor:
             "predictions": {}
         }
 
-        # AST
         if self.ast_model is not None:
             out["predictions"]["AST"] = self._predict_ast(y, sr)
         else:
             out["predictions"]["AST"] = {"error": "AST checkpoint not found"}
 
-        # CNN
         if self.cnn_model is not None:
             out["predictions"]["CNN"] = self._predict_cnn(y, sr)
         else:
             out["predictions"]["CNN"] = {"error": "CNN checkpoint not found"}
 
-        # RF
         if self.rf is not None:
             out["predictions"]["RandomForest"] = self._predict_mfcc_model(self.rf, y, sr)
         else:
             out["predictions"]["RandomForest"] = {"error": "RF model not found"}
 
-        # KNN
         if self.knn is not None:
             out["predictions"]["KNN"] = self._predict_mfcc_model(self.knn, y, sr)
         else:

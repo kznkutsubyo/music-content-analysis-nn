@@ -17,7 +17,7 @@ def main():
     ap.add_argument("--batch_size", type=int, default=8)
     ap.add_argument("--tdim", type=int, default=512)
     ap.add_argument("--crop_sec", type=float, default=5.0)
-    ap.add_argument("--model_size", type=str, default="small224")  # вместо base384
+    ap.add_argument("--model_size", type=str, default="small224")
     ap.add_argument("--accum_steps", type=int, default=16)
     args = ap.parse_args()
 

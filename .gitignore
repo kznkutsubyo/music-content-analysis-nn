@@ -1,0 +1,31 @@
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.venv-linux/
+venv/
+env/
+
+# Node / frontend
+node_modules/
+dist/
+.env
+.env.local
+
+# ML datasets and generated feature caches
+data/
+features_mfcc/
+pretrained_models/
+results/
+
+# Archives
+*.zip
+*.tar
+*.tar.gz
+*.7z

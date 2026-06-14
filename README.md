@@ -35,11 +35,26 @@ git lfs install
 
 ## Backend
 
+The easiest way to prepare and run the project on Linux/macOS is:
+
+```bash
+./scripts/setup.sh
+./scripts/run_app.sh
+```
+
+The application will be available at:
+
+```text
+http://127.0.0.1:5173/
+```
+
+Manual backend run:
+
 ```bash
 cd backend
 python -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-runtime.txt
 MODEL_DEVICE=cpu uvicorn app:app --host 127.0.0.1 --port 8001
 ```
 
@@ -50,6 +65,8 @@ curl http://127.0.0.1:8001/health
 ```
 
 ## Frontend
+
+Manual frontend run:
 
 ```bash
 cd frontend
